@@ -1,0 +1,151 @@
+﻿@using Expenses.App.Models
+@using Expenses.App.Services
+@inject IExpensesService expensesService
+@inject IJSRuntime JS
+
+<h3>My Expenses</h3>
+<div class="row mb-2">
+    <div class="col-md-12">
+        <div class="float-right" style="float: right !important;">
+            <button class="btn btn-primary" type="button" @onclick="onAddExpenseClicked">
+                Expense&nbsp;
+                <i class="oi oi-plus"></i>
+            </button>
+        </div>
+    </div>
+</div>
+<div class="row mb-1">
+    <div class="col-md-3">
+        <h5>Amount</h5>
+    </div>
+    <div class="col-md-5">
+        <h5>Description</h5>
+    </div>
+    <div class="col-md-3">
+        <h5>Date</h5>
+    </div>
+    <div class="col-md-1">&nbsp;</div>
+</div>
+<Virtualize Items="@expenses" Context="expense">
+    <div class="row mb-1">
+        <div class="col-md-3">
+            <div class="form-group">
+                <input class="form-control" @bind-value="@expense.Amount" type="number" />
+            </div>
+        </div>
+        <div class="col-md-5">
+            <div class="form-group">
+                <input class="form-control" @bind-value="@expense.Description" type="text" />
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="form-group">
+                <input class="form-control" @bind-value="@expense.Date" type="date" />
+            </div>
+        </div>
+        <div class="col-md-1" style="float: right !important;">
+            <div class="float-right" style="float: right !important;">
+                <button class="btn btn-success btn-block" type="button" @onclick="() => onSaveClicked(expense)">
+                    <i class="oi oi-pencil"></i>
+                </button>
+                <button class="btn btn-danger btn-block" type="button" @onclick="() => onDeleteClicked(expense)">
+                    <i class="oi oi-trash"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</Virtualize>
+<div class="row">
+    <div class="col-md-12 align-right">
+        <h6>Total: @Total</h6>
+    </div>
+</div>
+
+
+@code {
+    private List<Expense> expenses = new List<Expense>();
+    private decimal Total
+    {
+        get
+        {
+            return expenses.Sum(e => e.Amount);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        var serviceResult = await expensesService.FindAll();
+        if (serviceResult.IsError)
+        {
+            expenses = new List<Expense>();
+        }
+        else
+        {
+            expenses = serviceResult.Data.ToList();
+        }
+        StateHasChanged();
+    }
+
+    protected void onAddExpenseClicked()
+    {
+        expenses.Add(new Expense() { Date = DateTime.Now.Date });
+    }
+
+    protected async void onSaveClicked(Expense expense)
+    {
+        bool isNew = expense.ExpenseUid == Guid.Empty;
+        if (isNew)
+        {
+            var result = await expensesService.CreateExpense(expense);
+            if (result.IsError)
+            {
+                await JS.InvokeVoidAsync("alert", result.Error.Message);
+            }
+            else
+            {
+                await LoadData();
+            }
+        }
+        else
+        {
+            var expenseUid = expense.ExpenseUid;
+            var result = await expensesService.UpdateExpense(expenseUid, expense);
+            if (result.IsError)
+            {
+                await JS.InvokeVoidAsync("alert", result.Error.Message);
+            }
+            else
+            {
+                await LoadData();
+            }
+        }
+    }
+
+    protected async void onDeleteClicked(Expense expense)
+    {
+        bool isNew = expense.ExpenseUid == Guid.Empty;
+        if (isNew)
+        {
+            expenses.Remove(expense);
+        }
+        else
+        {
+            var expenseUid = expense.ExpenseUid;
+            var result = await expensesService.DeleteExpense(expenseUid);
+            if (result.IsError)
+            {
+                await JS.InvokeVoidAsync("alert", result.Error.Message);
+            }
+            else
+            {
+                await LoadData();
+            }
+        }
+    }
+}
+
